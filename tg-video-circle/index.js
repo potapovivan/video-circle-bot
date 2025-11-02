@@ -6,9 +6,6 @@ const ffmpeg = require("fluent-ffmpeg");
 // ✅ Используем встроенный fetch (Node 18+)
 const fetch = global.fetch;
 
-// const ffmpegPath = "C:/Users/User/Desktop/сборщики/ffmpeg-2025-10-30-git-00c23bafb0-essentials_build/bin/ffmpeg.exe";
-// ffmpeg.setFfmpegPath(ffmpegPath);
-
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
