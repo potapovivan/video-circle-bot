@@ -1,7 +1,7 @@
 {
-  "name": "tg-video-circle",
+  "name": "video-circle-bot",
   "version": "1.0.0",
-  "description": "Telegram bot that turns videos into circles (video notes).",
+  "description": "Telegram bot that converts regular videos into circle video notes.",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "telegraf": "^4.15.0",
+    "telegraf": "^4.16.3",
     "fluent-ffmpeg": "^2.1.2",
     "fs-extra": "^11.2.0"
   }
