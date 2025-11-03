@@ -3,8 +3,7 @@
   "version": "1.0.0",
   "description": "Telegram bot that converts videos to round video notes (circles) with sound.",
   "scripts": {
-    "build": "bash install_ffmpeg.sh",
-    "start": "bash install_ffmpeg.sh && node index.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
