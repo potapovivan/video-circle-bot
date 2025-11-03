@@ -2,11 +2,9 @@
   "name": "video-circle-bot",
   "version": "1.0.0",
   "description": "Telegram bot that converts videos to round video notes (circles) with sound.",
-  "build": {
-    "command": "apk add --no-cache ffmpeg"
-  },
   "scripts": {
-    "start": "node index.js"
+    "build": "bash install_ffmpeg.sh",
+    "start": "bash install_ffmpeg.sh && node index.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
