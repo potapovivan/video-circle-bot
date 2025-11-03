@@ -1,16 +1,21 @@
 {
-  "name": "video-circle-bot",
+  "name": "tg-video-circle",
   "version": "1.0.0",
-  "description": "Telegram bot that converts regular videos into circle video notes.",
+  "description": "Telegram бот: превращает видео в кружки со звуком (video_note).",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
-    "telegraf": "^4.16.3",
+    "dotenv": "^16.3.1",
+    "fs-extra": "^11.2.0",
     "fluent-ffmpeg": "^2.1.2",
-    "fs-extra": "^11.2.0"
-  }
+    "telegraf": "^4.15.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Ivan Potapov",
+  "license": "MIT"
 }
