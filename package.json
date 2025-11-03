@@ -1,0 +1,36 @@
+{
+  "name": "video-circle-bot",
+  "version": "1.0.0",
+  "description": "Telegram бот, который превращает любое видео в видео-кружок (video note) до 60 секунд, 1:1, со звуком и без сохранения файлов.",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/potapovivan/video-circle-bot.git"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "ffmpeg",
+    "video",
+    "circle",
+    "video-note",
+    "telegraf"
+  ],
+  "author": "Ivan Potapov",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/potapovivan/video-circle-bot/issues"
+  },
+  "homepage": "https://github.com/potapovivan/video-circle-bot#readme",
+  "dependencies": {
+    "fluent-ffmpeg": "^2.1.3",
+    "telegraf": "^4.16.3"
+  }
+}
