@@ -1,12 +1,9 @@
 {
   "name": "video-circle-bot",
   "version": "1.0.0",
-  "description": "Telegram bot that converts any video into a circular video note with sound.",
+  "description": "Telegram bot that converts any video into a circular video note.",
   "type": "module",
   "main": "index.js",
-  "engines": {
-    "node": ">=18"
-  },
   "scripts": {
     "start": "node index.js"
   },
