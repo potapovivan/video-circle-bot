@@ -84,19 +84,11 @@ bot.on(["video", "document"], async (ctx) => {
   }
 });
 
-const app = express();
-app.use(express.json());
-app.get("/", (req, res) => res.send("✅ VideoCircleBot running via Railway"));
+const webhookUrl = `${RAILWAY_STATIC_URL}/webhook/${BOT_TOKEN}`;
 
-if (RAILWAY_STATIC_URL) {
-  const webhookUrl = `${RAILWAY_STATIC_URL}/webhook/${BOT_TOKEN}`;
-  bot.telegram.setWebhook(webhookUrl);
-  app.use(bot.webhookCallback(`/webhook/${BOT_TOKEN}`));
-  app.listen(3000, () => console.log(`🚀 Webhook mode: ${webhookUrl}`));
-} else {
-  bot.launch();
-  console.log("🚀 Polling mode (local dev)");
-}
+await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+await bot.telegram.setWebhook(webhookUrl);
+app.use(bot.webhookCallback(`/webhook/${BOT_TOKEN}`));
 
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+app.listen(3000, () => console.log(`🚀 Webhook mode: ${webhookUrl}`));
+
