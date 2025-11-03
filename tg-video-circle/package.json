@@ -8,6 +8,7 @@
     "postinstall": "apt-get update && apt-get install -y ffmpeg"
   },
   "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "dotenv": "^16.4.5",
     "fluent-ffmpeg": "^2.1.2",
     "fs-extra": "^11.2.0",

@@ -2,6 +2,8 @@ require("dotenv").config();
 const { Telegraf } = require("telegraf");
 const fs = require("fs-extra");
 const ffmpeg = require("fluent-ffmpeg");
+const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 const http = require("http");
 
 // В Node 18+ fetch встроен
