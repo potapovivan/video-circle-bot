@@ -86,6 +86,7 @@ bot.launch().then(() => console.log("🤖 Бот запущен и ждёт ви
 const http = require("http");
 http
   .createServer((req, res) => {
+    console.log("PING / — uptime check"); // строка, по которой мы увидим пинги в Render Logs
     res.write("Bot is running");
     res.end();
   })
