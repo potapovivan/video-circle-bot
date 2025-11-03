@@ -5,9 +5,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-// === CONFIG ===
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const DOMAIN = process.env.RAILWAY_STATIC_URL; // Railway автоматически задаёт HTTPS-домен
+const DOMAIN = process.env.RAILWAY_STATIC_URL;
 const PORT = process.env.PORT || 3000;
 
 if (!BOT_TOKEN) {
@@ -18,12 +17,11 @@ if (!BOT_TOKEN) {
 const bot = new Telegraf(BOT_TOKEN);
 const app = express();
 
-// === FFmpeg helpers ===
 const isVideoDocument = (doc) => doc?.mime_type?.startsWith("video/") ?? false;
 
-// === BOT LOGIC ===
+// === Основная логика ===
 bot.start((ctx) =>
-  ctx.reply("🎬 Отправь мне видео — я обрежу до 60 сек и сделаю кружок со звуком.")
+  ctx.reply("🎬 Отправь видео — я обрежу до 60 сек, сделаю 1:1 и верну кружок со звуком.")
 );
 
 bot.on(["video", "document"], async (ctx) => {
@@ -50,8 +48,7 @@ bot.on(["video", "document"], async (ctx) => {
     // сохраняем видео во временный файл
     tempInput = path.join(os.tmpdir(), `input_${Date.now()}.mp4`);
     tempOutput = path.join(os.tmpdir(), `output_${Date.now()}.mp4`);
-    const buffer = Buffer.from(await res.arrayBuffer());
-    fs.writeFileSync(tempInput, buffer);
+    fs.writeFileSync(tempInput, Buffer.from(await res.arrayBuffer()));
 
     // запускаем ffmpeg
     const ffmpegArgs = [
@@ -75,7 +72,6 @@ bot.on(["video", "document"], async (ctx) => {
       ff.on("error", reject);
     });
 
-    // отправляем результат
     const outBuffer = fs.readFileSync(tempOutput);
     await ctx.replyWithVideoNote(
       { source: outBuffer, filename: "circle.mp4" },
@@ -94,19 +90,26 @@ bot.on(["video", "document"], async (ctx) => {
   }
 });
 
-// === WEBHOOK CONFIG ===
+// === ПРОДАКШЕН-ЗАПУСК ===
 
-// Удаляем старые polling/webhook, чтобы Telegram не конфликтовал
-await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+// Автоматический сброс старых polling/webhook соединений
+(async () => {
+  try {
+    console.log("🧹 Сброс старых polling/webhook соединений...");
+    await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+    await new Promise((r) => setTimeout(r, 1000));
 
-// Настраиваем новый webhook
-const webhookPath = `/webhook/${BOT_TOKEN}`;
-const webhookURL = `https://${DOMAIN}${webhookPath}`;
+    const webhookPath = `/webhook/${BOT_TOKEN}`;
+    const webhookURL = `https://${DOMAIN}${webhookPath}`;
 
-await bot.telegram.setWebhook(webhookURL);
-app.use(bot.webhookCallback(webhookPath));
+    await bot.telegram.setWebhook(webhookURL);
+    app.use(bot.webhookCallback(webhookPath));
 
-app.get("/", (req, res) => res.send("✅ Telegram bot is running via Webhook!"));
-app.listen(PORT, () =>
-  console.log(`✅ Webhook mode active: ${webhookURL}`)
-);
+    app.get("/", (req, res) => res.send("✅ Telegram bot is running on Railway with Webhook."));
+    app.listen(PORT, () =>
+      console.log(`🚀 Webhook mode active: ${webhookURL}`)
+    );
+  } catch (err) {
+    console.error("🔥 Ошибка при настройке webhook:", err);
+  }
+})();
