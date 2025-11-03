@@ -3,15 +3,19 @@ const { Telegraf } = require("telegraf");
 const fs = require("fs-extra");
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-const http = require("http");
 
-// В Node 18+ fetch встроен
+// ✅ Указываем путь к бинарнику ffmpeg
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+console.log("🧩 ffmpeg path:", ffmpegInstaller.path);
+
+const http = require("http");
 const fetch = global.fetch;
 
 // --- Проверяем наличие токена ---
 if (!process.env.BOT_TOKEN) {
-  console.error("❌ BOT_TOKEN отсутствует. Добавь его в Render Environment Variables.");
+  console.error(
+    "❌ BOT_TOKEN отсутствует. Добавь его в Render Environment Variables."
+  );
   process.exit(1);
 }
 
@@ -57,7 +61,7 @@ bot.on("video", async (ctx) => {
           "-c:a aac",
           "-b:a 128k",
           "-movflags +faststart",
-          "-pix_fmt yuv420p"
+          "-pix_fmt yuv420p",
         ])
         .on("progress", async (p) => {
           const percent = Math.floor(p.percent || 0);
@@ -96,21 +100,26 @@ bot.on("video", async (ctx) => {
 bot.on("video_note", async (ctx) => ctx.reply("Это уже кружочек 😎"));
 
 // --- Запуск бота ---
-bot.launch()
+bot
+  .launch()
   .then(() => console.log("🤖 Бот запущен на Render и ждёт видео!"))
   .catch((err) => {
     console.error("Ошибка запуска бота:", err.message);
     if (err.message.includes("409")) {
-      console.log("⚠️ Найден другой активный экземпляр. Ждём, пока Render оставит один...");
+      console.log(
+        "⚠️ Найден другой активный экземпляр. Ждём, пока Render оставит один..."
+      );
     }
   });
 
 // --- HTTP-сервер для Render Free (чтобы сервис не засыпал) ---
-http.createServer((req, res) => {
-  console.log("PING / — uptime check");
-  res.write("Bot is running");
-  res.end();
-}).listen(process.env.PORT || 10000);
+http
+  .createServer((req, res) => {
+    console.log("PING / — uptime check");
+    res.write("Bot is running");
+    res.end();
+  })
+  .listen(process.env.PORT || 10000);
 
 // --- Keep-alive каждые 14 мин ---
 setInterval(() => console.log("🟢 Keep-alive ping..."), 14 * 60 * 1000);
