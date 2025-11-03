@@ -1,94 +1,126 @@
 import express from "express";
 import { Telegraf } from "telegraf";
-import { spawn } from "node:child_process";
-import { execSync } from "child_process";
+import { spawn, execSync } from "child_process";
 import fs from "fs";
+import os from "os";
+import path from "path";
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-const RAILWAY_STATIC_URL = process.env.RAILWAY_STATIC_URL;
+const DOMAIN = process.env.RAILWAY_STATIC_URL;
+const PORT = process.env.PORT || 3000;
 
 if (!BOT_TOKEN) {
-  console.error("❌ BOT_TOKEN is not set. Add it in Railway → Variables.");
+  console.error("❌ BOT_TOKEN не задан. Добавь его в Railway → Variables.");
   process.exit(1);
 }
 
-// Проверяем, что ffmpeg есть в PATH
+// Проверяем наличие ffmpeg
 try {
-  execSync("ffmpeg -version", { stdio: "inherit" });
-  console.log("✅ ffmpeg detected in PATH");
+  execSync("ffmpeg -version", { stdio: "ignore" });
+  console.log("✅ ffmpeg найден в системе");
 } catch (err) {
-  console.error("❌ ffmpeg not found! Make sure it's installed in Railway.");
+  console.error("❌ ffmpeg не найден! Проверь установку в nixpacks.toml");
+  process.exit(1);
 }
 
+// Создаём бота
 const bot = new Telegraf(BOT_TOKEN);
+const app = express();
 
-// Универсальный фильтр — видео или документ с видео
-const isVideoDoc = (doc) => doc?.mime_type?.startsWith("video/");
+// Команда /start
+bot.start((ctx) =>
+  ctx.reply("🎬 Отправь мне видео — я обрежу до 60 секунд, сделаю квадрат 1:1 и верну кружок со звуком.")
+);
 
-bot.start(async (ctx) => {
-  await ctx.reply(
-    "🎥 Пришли мне видео — я обрежу до 60 сек, сделаю 1:1 и верну кружок со звуком.\n" +
-    "Поддерживаются обычные видео или видео-файл как документ."
-  );
-});
+// Проверяем, видео ли это
+const isVideo = (file) => file?.mime_type?.startsWith("video/");
 
-// Основной обработчик видео
+// Обработка видео
 bot.on(["video", "document"], async (ctx) => {
+  let inputFile = null;
+  let outputFile = null;
+
   try {
-    const file = ctx.message.video || ctx.message.document;
-    if (!isVideoDoc(file)) return;
+    const file =
+      ctx.message.video ||
+      (isVideo(ctx.message.document) ? ctx.message.document : null);
 
-    const fileId = file.file_id;
-    const fileUrl = await ctx.telegram.getFileLink(fileId);
+    if (!file) {
+      return ctx.reply("⚠️ Это не видео. Пришли файл с видео или видео-документ.");
+    }
 
-    const inputPath = `/tmp/input_${Date.now()}.mp4`;
-    const outputPath = `/tmp/output_${Date.now()}.mp4`;
+    const fileLink = await ctx.telegram.getFileLink(file.file_id);
+    const response = await fetch(fileLink.href);
+    if (!response.ok) throw new Error("Ошибка загрузки файла");
 
-    // Скачиваем файл
-    const res = await fetch(fileUrl.href);
-    const buffer = Buffer.from(await res.arrayBuffer());
-    fs.writeFileSync(inputPath, buffer);
+    inputFile = path.join(os.tmpdir(), `input_${Date.now()}.mp4`);
+    outputFile = path.join(os.tmpdir(), `output_${Date.now()}.mp4`);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(inputFile, buffer);
 
     await ctx.reply("⏳ Обрабатываю видео...");
 
-    // ffmpeg обработка
-    await new Promise((resolve, reject) => {
-      const ffmpeg = spawn("ffmpeg", [
-        "-y",
-        "-i", inputPath,
-        "-t", "60",
-        "-vf", "crop='min(iw,ih)':'min(iw,ih)',scale=480:480,fps=30",
-        "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-crf", "23",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-movflags", "+faststart",
-        outputPath
-      ]);
+    // FFmpeg команда
+    const ffmpegArgs = [
+      "-y",
+      "-i", inputFile,
+      "-t", "60",
+      "-vf", "crop='min(iw,ih)':'min(iw,ih)',scale=480:480,fps=30",
+      "-c:v", "libx264",
+      "-preset", "veryfast",
+      "-crf", "23",
+      "-pix_fmt", "yuv420p",
+      "-c:a", "aac",
+      "-b:a", "128k",
+      "-movflags", "+faststart",
+      outputFile,
+    ];
 
-      ffmpeg.on("close", (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`FFmpeg exited with code ${code}`));
-      });
+    await new Promise((resolve, reject) => {
+      const ff = spawn("ffmpeg", ffmpegArgs);
+      ff.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`FFmpeg exited with code ${code}`))));
+      ff.on("error", reject);
     });
 
-    await ctx.replyWithVideoNote({ source: outputPath });
-    fs.unlinkSync(inputPath);
-    fs.unlinkSync(outputPath);
+    await ctx.replyWithVideoNote({ source: outputFile });
+    console.log("✅ Видео обработано успешно");
 
   } catch (err) {
     console.error("❌ Ошибка обработки видео:", err);
     await ctx.reply("❌ Не удалось обработать видео. Попробуй другое или короче 60 сек.");
+  } finally {
+    try {
+      if (inputFile && fs.existsSync(inputFile)) fs.unlinkSync(inputFile);
+      if (outputFile && fs.existsSync(outputFile)) fs.unlinkSync(outputFile);
+    } catch {}
   }
 });
 
-const webhookUrl = `${RAILWAY_STATIC_URL}/webhook/${BOT_TOKEN}`;
+// === ТОЛЬКО WEBHOOK, НИКАКОГО POLLING ===
+(async () => {
+  try {
+    if (!DOMAIN) {
+      console.error("❌ DOMAIN (RAILWAY_STATIC_URL) не задан!");
+      process.exit(1);
+    }
 
-await bot.telegram.deleteWebhook({ drop_pending_updates: true });
-await bot.telegram.setWebhook(webhookUrl);
-app.use(bot.webhookCallback(`/webhook/${BOT_TOKEN}`));
+    const webhookPath = `/webhook/${BOT_TOKEN}`;
+    const webhookUrl = `https://${DOMAIN}${webhookPath}`;
 
-app.listen(3000, () => console.log(`🚀 Webhook mode: ${webhookUrl}`));
+    console.log("🧹 Сбрасываю старые webhook и polling...");
+    await bot.telegram.deleteWebhook({ drop_pending_updates: true });
 
+    console.log("⚙️ Устанавливаю новый webhook...");
+    await bot.telegram.setWebhook(webhookUrl);
+
+    app.use(bot.webhookCallback(webhookPath));
+    app.get("/", (req, res) => res.send("✅ VideoCircleBot работает на Railway (Webhook Mode)"));
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Webhook активен: ${webhookUrl}`);
+      console.log("✅ Бот готов принимать видео через Telegram!");
+    });
+  } catch (err) {
+    console.error("🔥 Ошибка при установке webhook:", err);
+  }
+})();
