@@ -8,6 +8,7 @@
     "node": ">=18"
   },
   "scripts": {
+    "build": "apt-get update && apt-get install -y ffmpeg",
     "start": "node index.js"
   },
   "dependencies": {
