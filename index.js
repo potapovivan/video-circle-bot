@@ -1,30 +1,35 @@
+import express from "express";
 import { Telegraf } from "telegraf";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { Readable } from "node:stream";
 
+// === CONFIG ===
 const BOT_TOKEN = process.env.BOT_TOKEN;
+const DOMAIN = process.env.RAILWAY_STATIC_URL; // Railway автоматически задаёт HTTPS-домен
+const PORT = process.env.PORT || 3000;
+
 if (!BOT_TOKEN) {
   console.error("❌ BOT_TOKEN is not set.");
   process.exit(1);
 }
 
 const bot = new Telegraf(BOT_TOKEN);
+const app = express();
 
-// проверка: видео или нет
+// === FFmpeg helpers ===
 const isVideoDocument = (doc) => doc?.mime_type?.startsWith("video/") ?? false;
 
+// === BOT LOGIC ===
 bot.start((ctx) =>
-  ctx.reply(
-    "🎥 Пришли видео — я обрежу до 60 сек, сделаю 1:1 и верну видео-кружок со звуком."
-  )
+  ctx.reply("🎬 Отправь мне видео — я обрежу до 60 сек и сделаю кружок со звуком.")
 );
 
 bot.on(["video", "document"], async (ctx) => {
   let tempInput = null;
   let tempOutput = null;
+
   try {
     const fileId =
       ctx.message.video?.file_id ??
@@ -42,13 +47,13 @@ bot.on(["video", "document"], async (ctx) => {
     const res = await fetch(fileUrl);
     if (!res.ok) throw new Error(`Не удалось скачать: ${res.statusText}`);
 
-    // === сохраняем видео во временный файл ===
+    // сохраняем видео во временный файл
     tempInput = path.join(os.tmpdir(), `input_${Date.now()}.mp4`);
     tempOutput = path.join(os.tmpdir(), `output_${Date.now()}.mp4`);
     const buffer = Buffer.from(await res.arrayBuffer());
     fs.writeFileSync(tempInput, buffer);
 
-    // === запускаем ffmpeg ===
+    // запускаем ffmpeg
     const ffmpegArgs = [
       "-y",
       "-i", tempInput,
@@ -64,22 +69,14 @@ bot.on(["video", "document"], async (ctx) => {
       tempOutput
     ];
 
-    const ff = spawn("ffmpeg", ffmpegArgs, { stdio: ["ignore", "pipe", "pipe"] });
-
-    ff.stderr.on("data", (d) => {
-      const s = d.toString();
-      if (s.toLowerCase().includes("error")) console.log("🧩 ffmpeg:", s);
-    });
-
     await new Promise((resolve, reject) => {
+      const ff = spawn("ffmpeg", ffmpegArgs);
       ff.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`FFmpeg exited ${code}`))));
       ff.on("error", reject);
     });
 
-    // === читаем готовый файл и отправляем как кружок ===
+    // отправляем результат
     const outBuffer = fs.readFileSync(tempOutput);
-    if (!outBuffer.length) throw new Error("FFmpeg output empty");
-
     await ctx.replyWithVideoNote(
       { source: outBuffer, filename: "circle.mp4" },
       { length: 480, duration: 60 }
@@ -88,9 +85,8 @@ bot.on(["video", "document"], async (ctx) => {
     await ctx.deleteMessage(waitMsg.message_id);
   } catch (err) {
     console.error("❌ Ошибка обработки видео:", err);
-    await ctx.reply("Не удалось обработать видео. Попробуйте другое или короче 60 сек.");
+    await ctx.reply("Не удалось обработать видео. Попробуйте другое.");
   } finally {
-    // удаляем временные файлы
     try {
       if (tempInput && fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
       if (tempOutput && fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
@@ -98,7 +94,19 @@ bot.on(["video", "document"], async (ctx) => {
   }
 });
 
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+// === WEBHOOK CONFIG ===
 
-bot.launch().then(() => console.log("✅ Bot is up and running."));
+// Удаляем старые polling/webhook, чтобы Telegram не конфликтовал
+await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+
+// Настраиваем новый webhook
+const webhookPath = `/webhook/${BOT_TOKEN}`;
+const webhookURL = `https://${DOMAIN}${webhookPath}`;
+
+await bot.telegram.setWebhook(webhookURL);
+app.use(bot.webhookCallback(webhookPath));
+
+app.get("/", (req, res) => res.send("✅ Telegram bot is running via Webhook!"));
+app.listen(PORT, () =>
+  console.log(`✅ Webhook mode active: ${webhookURL}`)
+);
